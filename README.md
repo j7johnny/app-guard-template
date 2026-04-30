@@ -22,7 +22,7 @@
 
 ## 快速開始
 
-1. 到 `worker/` 部署 Cloudflare Worker。
+1. Worker 已部署於 `https://app-guard.j7johnny1210.workers.dev`。
 2. 用 `worker/examples/rules.example.json` 上傳一份政策規則。
 3. 把 `python-sdk/app_guard.py` 複製到你的 Python 專案。
 4. 打包前產生 `build_info.py`。

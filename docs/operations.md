@@ -1,5 +1,16 @@
 # 維運操作
 
+## 目前部署資訊
+
+- Worker name：`app-guard`
+- Worker endpoint：`https://app-guard.j7johnny1210.workers.dev`
+- KV namespace：`APP_GUARD_RULES`
+- KV namespace ID：`b9ce049195274634b6dd51430cb79f8c`
+- D1 database：`app_guard_events`
+- D1 database ID：`5637c371-1609-4523-9e0e-d9f8a5e9a62d`
+
+`ADMIN_TOKEN` 是管理 API 用的機密值，已寫在本機 `.dev.vars`，不要 commit 到 GitHub。
+
 ## 建立 Cloudflare 資源
 
 ```powershell
@@ -12,18 +23,18 @@ wrangler d1 migrations apply app_guard_events --remote
 wrangler deploy
 ```
 
-Cloudflare 會回傳 KV namespace ID 與 D1 database ID。請把這些值填進 `wrangler.toml`。
+Cloudflare 會回傳 KV namespace ID 與 D1 database ID。請把這些值填進 `wrangler.toml`。目前根目錄 `wrangler.toml` 已填入上述資源 ID。
 
 ## 上傳規則
 
 ```powershell
-node .\tools\push-rules.mjs https://your-worker.workers.dev $env:APP_GUARD_ADMIN_TOKEN .\examples\rules.example.json
+node .\worker\tools\push-rules.mjs https://app-guard.j7johnny1210.workers.dev $env:APP_GUARD_ADMIN_TOKEN .\worker\examples\rules.example.json
 ```
 
 ## 查詢統計
 
 ```powershell
-node .\tools\get-stats.mjs https://your-worker.workers.dev $env:APP_GUARD_ADMIN_TOKEN my_tool 30
+node .\worker\tools\get-stats.mjs https://app-guard.j7johnny1210.workers.dev $env:APP_GUARD_ADMIN_TOKEN my_tool 30
 ```
 
 這會查詢 `my_tool` 最近 30 天的版本分布、build 分布與每日活躍摘要。
