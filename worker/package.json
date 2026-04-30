@@ -1,0 +1,19 @@
+{
+  "name": "app-guard-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply app_guard_events --local",
+    "migrate:remote": "wrangler d1 migrations apply app_guard_events --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260430.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0",
+    "wrangler": "^4.34.0"
+  }
+}

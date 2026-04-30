@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+wrangler.toml
+__pycache__/
+*.pyc
+python-sdk/_tmp/
+python-sdk/tests/cache/*/tool/guard-cache.json

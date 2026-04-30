@@ -1,0 +1,63 @@
+{
+  "app_id": "my_tool",
+  "policy": {
+    "schema_version": 1,
+    "default": {
+      "status": "allow",
+      "message": "",
+      "message_level": "info",
+      "next_check_after_seconds": 86400,
+      "support_url": "https://example.com/support"
+    },
+    "telemetry": {
+      "enabled": true,
+      "sample_rate": 1
+    },
+    "rules": [
+      {
+        "id": "disable-leaked-build",
+        "enabled": true,
+        "priority": 100,
+        "match": {
+          "build_id": "20260430-leaked"
+        },
+        "action": {
+          "status": "disabled",
+          "disable": true,
+          "message_level": "error",
+          "message": "此測試版已停止使用。請向提供者索取新版。",
+          "support_url": "https://example.com/support",
+          "next_check_after_seconds": 3600
+        }
+      },
+      {
+        "id": "warn-old-version",
+        "enabled": true,
+        "priority": 50,
+        "match": {
+          "version_lt": "1.2.0"
+        },
+        "action": {
+          "status": "warn",
+          "message_level": "warning",
+          "message": "你正在使用舊版，建議更新到 1.2.0 或更新版本。",
+          "min_version": "1.2.0",
+          "next_check_after_seconds": 86400
+        }
+      },
+      {
+        "id": "batch-specific-note",
+        "enabled": true,
+        "priority": 40,
+        "match": {
+          "batch_id": "friend-group-a"
+        },
+        "action": {
+          "status": "warn",
+          "message_level": "info",
+          "message": "這批檔案有新版可取用，原功能仍可繼續使用。"
+        }
+      }
+    ]
+  }
+}

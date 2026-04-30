@@ -1,0 +1,15 @@
+name = "app-guard"
+main = "src/index.ts"
+compatibility_date = "2026-04-30"
+
+kv_namespaces = [
+  { binding = "APP_GUARD_RULES", id = "replace-with-kv-namespace-id" }
+]
+
+[[d1_databases]]
+binding = "APP_GUARD_DB"
+database_name = "app_guard_events"
+database_id = "replace-with-d1-database-id"
+
+# Set this as a secret instead of plaintext:
+# wrangler secret put ADMIN_TOKEN

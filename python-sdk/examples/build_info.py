@@ -1,0 +1,8 @@
+APP_ID = "my_tool"
+VERSION = "1.0.0"
+BUILD_ID = "20260430-local"
+BATCH_ID = "friend-group-a"
+CHANNEL = "release"
+BUILT_AT = "2026-04-30T00:00:00Z"
+GIT_COMMIT = "local"
+ENDPOINT = "https://replace-with-your-worker.workers.dev"
