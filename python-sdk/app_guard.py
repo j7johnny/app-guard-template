@@ -5,7 +5,9 @@ Design goals:
 - send only minimal whitelisted metadata;
 - create a random local install_id, never a hardware fingerprint;
 - fail open on network/server errors by default;
-- cache recent disabled decisions for explicit remote stops;
+- check the remote policy on every startup;
+- cache recent disabled decisions only, so explicit remote stops remain active
+  during short network failures;
 - never download or execute remote code.
 """
 
@@ -66,7 +68,7 @@ def startup_check(
     cache_dir: Optional[str | os.PathLike[str]] = None,
     prompt_handler: Optional[PromptHandler] = None,
     fail_open: bool = True,
-    force_check: bool = False,
+    force_check: bool = True,
     telemetry_enabled: bool = True,
 ) -> GuardResult:
     """
@@ -74,15 +76,17 @@ def startup_check(
 
     Call this near the top of your CLI or GUI entrypoint. If the result is
     disabled, stop the app after displaying the message.
+
+    By default this calls the remote endpoint on every startup. The local cache
+    is only used after network/server errors when an active disabled decision
+    exists, so a remotely stopped build can remain stopped during short network
+    outages. force_check is kept for backward compatibility; allow/warn
+    decisions are never used to skip startup checks.
     """
 
     cache = _load_cache(app_id, cache_dir)
     now = int(time.time())
-
-    cached_result = _cached_result_if_valid(cache, now)
-    if cached_result and not force_check:
-        _prompt_if_needed(cached_result, prompt_handler)
-        return cached_result
+    cached_disabled_result = _cached_result_if_valid(cache, now)
 
     install_id = _get_or_create_install_id(cache)
     payload = _build_payload(
@@ -99,6 +103,9 @@ def startup_check(
     try:
         result = _post_check(endpoint, payload, timeout_seconds)
     except Exception as exc:
+        if cached_disabled_result:
+            _prompt_if_needed(cached_disabled_result, prompt_handler)
+            return cached_disabled_result
         fallback = GuardResult(status="allow", source="fail-open", error=str(exc))
         if not fail_open:
             fallback = GuardResult(
@@ -183,7 +190,10 @@ def _post_check(endpoint: str, payload: Mapping[str, str], timeout_seconds: floa
     request = urllib.request.Request(
         endpoint.rstrip("/") + "/check",
         data=data,
-        headers={"content-type": "application/json; charset=utf-8"},
+        headers={
+            "content-type": "application/json; charset=utf-8",
+            "user-agent": f"AppGuardSDK/{SDK_VERSION}",
+        },
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
@@ -217,7 +227,6 @@ def _save_cache(
     now: int,
 ) -> None:
     cache["last_checked_at"] = now
-    cache["next_check_at"] = now + max(60, int(result.next_check_after_seconds))
     if result.disabled:
         cache["disabled_until"] = now + min(
             MAX_DISABLED_CACHE_SECONDS,
@@ -225,6 +234,7 @@ def _save_cache(
         )
     else:
         cache.pop("disabled_until", None)
+        cache.pop("next_check_at", None)
     cache["last_result"] = {
         "status": result.status,
         "message": result.message,
@@ -248,9 +258,6 @@ def _cached_result_if_valid(cache: Mapping[str, Any], now: int) -> Optional[Guar
     disabled_until = int(cache.get("disabled_until") or 0)
     if disabled_until and disabled_until > now:
         return _result_from_cache(last, source="cache-disabled")
-    next_check_at = int(cache.get("next_check_at") or 0)
-    if next_check_at > now:
-        return _result_from_cache(last, source="cache")
     return None
 
 

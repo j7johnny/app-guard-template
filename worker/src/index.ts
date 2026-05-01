@@ -36,7 +36,9 @@ export default {
       if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
       if (request.method === "POST" && url.pathname === "/check") return cors(await handleCheck(request, env));
       if (request.method === "POST" && url.pathname === "/event") return cors(await handleEvent(request, env));
+      if (request.method === "GET" && url.pathname === "/admin/apps") return cors(await handleApps(request, env, url));
       if (request.method === "GET" && url.pathname === "/admin/stats") return cors(await handleStats(request, env, url));
+      if (request.method === "GET" && url.pathname === "/admin/rules") return cors(await handleGetRules(request, env, url));
       if (request.method === "POST" && url.pathname === "/admin/rules") return cors(await handleRules(request, env));
       return json({ error: "not_found" }, 404);
     } catch (err) {
@@ -76,6 +78,30 @@ async function handleEvent(request: Request, env: Env): Promise<Response> {
   return json({ ok: true });
 }
 
+async function handleApps(request: Request, env: Env, url: URL): Promise<Response> {
+  const auth = requireAdmin(request, env);
+  if (auth) return auth;
+
+  const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days") ?? "30") || 30));
+  const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
+  const rows = await env.APP_GUARD_DB.prepare(
+    `SELECT app_id,
+            COUNT(*) AS checks,
+            COUNT(DISTINCT install_id) AS installs,
+            MAX(created_at) AS last_seen
+     FROM guard_events
+     WHERE event = 'startup_check' AND created_at >= ?
+     GROUP BY app_id
+     ORDER BY last_seen DESC, checks DESC
+     LIMIT 200`,
+  ).bind(since).all();
+
+  return json({
+    days,
+    apps: rows.results,
+  });
+}
+
 async function handleStats(request: Request, env: Env, url: URL): Promise<Response> {
   const auth = requireAdmin(request, env);
   if (auth) return auth;
@@ -94,10 +120,10 @@ async function handleStats(request: Request, env: Env, url: URL): Promise<Respon
   ).bind(appId, since).all();
 
   const buildRows = await env.APP_GUARD_DB.prepare(
-    `SELECT build_id, batch_id, COUNT(*) AS checks, COUNT(DISTINCT install_id) AS installs
+    `SELECT version, build_id, batch_id, COUNT(*) AS checks, COUNT(DISTINCT install_id) AS installs
      FROM guard_events
      WHERE app_id = ? AND event = 'startup_check' AND created_at >= ?
-     GROUP BY build_id, batch_id
+     GROUP BY version, build_id, batch_id
      ORDER BY installs DESC, checks DESC
      LIMIT 100`,
   ).bind(appId, since).all();
@@ -119,6 +145,25 @@ async function handleStats(request: Request, env: Env, url: URL): Promise<Respon
   });
 }
 
+async function handleGetRules(request: Request, env: Env, url: URL): Promise<Response> {
+  const auth = requireAdmin(request, env);
+  if (auth) return auth;
+
+  const appId = url.searchParams.get("app_id");
+  if (!appId || !/^[a-zA-Z0-9_.-]{1,80}$/.test(appId)) {
+    return json({ error: "invalid_app_id" }, 400);
+  }
+
+  const key = policyKey(appId);
+  const policy = await env.APP_GUARD_RULES.get(key, "json") as AppPolicy | null;
+  return json({
+    app_id: appId,
+    key,
+    policy: policy ?? defaultPolicy(),
+    exists: Boolean(policy),
+  });
+}
+
 async function handleRules(request: Request, env: Env): Promise<Response> {
   const auth = requireAdmin(request, env);
   if (auth) return auth;
@@ -134,6 +179,24 @@ async function handleRules(request: Request, env: Env): Promise<Response> {
   const key = policyKey(body.app_id);
   await env.APP_GUARD_RULES.put(key, JSON.stringify(body.policy, null, 2));
   return json({ ok: true, key });
+}
+
+function defaultPolicy(): AppPolicy {
+  return {
+    schema_version: 1,
+    default: {
+      status: "allow",
+      message: "",
+      message_level: "info",
+      next_check_after_seconds: 86400,
+      support_url: "",
+    },
+    telemetry: {
+      enabled: true,
+      sample_rate: 1,
+    },
+    rules: [],
+  };
 }
 
 async function readClientPayload(request: Request): Promise<GuardRequest> {

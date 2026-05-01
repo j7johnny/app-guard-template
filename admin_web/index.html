@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Guard 管理台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+      --border: #d7dce2;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #667085;
+      --accent: #1769aa;
+      --danger: #b42318;
+      --warn: #b54708;
+      --ok: #027a48;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; background: #1f2933; color: #fff;
+    }
+    header h1 { margin: 0; font-size: 18px; font-weight: 650; }
+    main { padding: 14px; display: grid; gap: 12px; }
+    section {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px;
+    }
+    h2 { margin: 0 0 10px; font-size: 15px; }
+    label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+    input, select, textarea, button {
+      font: inherit; border: 1px solid var(--border); border-radius: 6px;
+    }
+    input, select, textarea { padding: 8px; background: #fff; color: var(--text); }
+    textarea { min-height: 170px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
+    textarea.message-editor { min-height: 72px; font-family: inherit; font-size: 13px; }
+    button {
+      padding: 8px 10px; background: #fff; cursor: pointer;
+      color: var(--text); white-space: nowrap;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+    button.warn { background: var(--warn); border-color: var(--warn); color: #fff; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: #eef1f4; font-weight: 650; }
+    tr.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .grid { display: grid; gap: 10px; }
+    .cols-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .cols-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+    .status { color: var(--muted); font-size: 13px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #eef1f4; }
+    .pill.disabled { background: #fee4e2; color: var(--danger); }
+    .pill.warn { background: #fef0c7; color: var(--warn); }
+    .pill.allow { background: #d1fadf; color: var(--ok); }
+    .layout { grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+    .muted { color: var(--muted); }
+    @media (max-width: 900px) {
+      .layout, .cols-2, .cols-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>App Guard 管理台</h1>
+    <div id="status" class="status">尚未查詢</div>
+  </header>
+
+  <main>
+    <section class="grid">
+      <h2>連線設定</h2>
+      <div class="toolbar">
+        <label style="min-width: 360px; flex: 1">
+          Endpoint
+          <input id="endpoint" value="https://app-guard.j7johnny1210.workers.dev">
+        </label>
+        <label style="min-width: 320px; flex: 1">
+          Admin Token
+          <input id="token" type="password" placeholder="貼上 ADMIN_TOKEN">
+        </label>
+        <label style="width: 90px">
+          天數
+          <input id="days" type="number" min="1" max="90" value="30">
+        </label>
+        <button class="primary" id="loadAppsBtn">載入全部 App</button>
+      </div>
+    </section>
+
+    <div class="grid layout">
+      <section class="grid">
+        <h2>App 清單</h2>
+        <div class="toolbar">
+          <select id="appSelect" style="min-width: 210px; flex: 1"></select>
+          <button id="loadAppBtn">查詢選取 App</button>
+        </div>
+        <table>
+          <thead><tr><th>App ID</th><th>Checks</th><th>Installs</th></tr></thead>
+          <tbody id="appsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="grid">
+        <h2>活躍 Build / Batch</h2>
+        <div class="toolbar">
+          <button class="danger" id="blockBuildBtn">封鎖選取 BUILD_ID</button>
+          <button class="danger" id="blockBatchBtn">封鎖選取 batch_id</button>
+        </div>
+        <table>
+          <thead><tr><th>Version</th><th>BUILD_ID</th><th>batch_id</th><th>Checks</th><th>Installs</th></tr></thead>
+          <tbody id="buildsBody"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="grid">
+      <h2>版本控管</h2>
+      <div class="toolbar">
+        <label>
+          最低版本
+          <input id="minVersion" placeholder="例如 1.1.0">
+        </label>
+        <button class="warn" id="warnOldVersionBtn">警告低於此版本</button>
+        <button class="danger" id="disableOldVersionBtn">停用低於此版本</button>
+        <label>
+          停用指定版本
+          <input id="disabledVersion" placeholder="例如 1.0.0">
+        </label>
+        <button class="danger" id="disableVersionBtn">停用此版本</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <h2>規則維護</h2>
+      <div class="toolbar">
+        <button id="enableRuleBtn">啟用選取規則</button>
+        <button id="disableRuleBtn">停用選取規則</button>
+        <button class="danger" id="deleteRuleBtn">刪除選取規則</button>
+      </div>
+      <div class="grid cols-2">
+        <label>
+          選取規則訊息
+          <textarea id="selectedRuleMessage" class="message-editor" placeholder="先選取下方一筆規則，再修改要顯示給使用者的訊息。"></textarea>
+        </label>
+        <div class="toolbar">
+          <button class="primary" id="saveRuleMessageBtn">儲存選取規則訊息</button>
+          <span class="muted">此訊息會在 warn 或 disabled 時顯示給使用者。</span>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>狀態</th><th>條件</th><th>動作</th><th>訊息</th></tr></thead>
+        <tbody id="rulesBody"></tbody>
+      </table>
+    </section>
+
+    <section class="grid cols-2">
+      <div class="grid">
+        <h2>版本分布</h2>
+        <table>
+          <thead><tr><th>Version</th><th>Checks</th><th>Installs</th></tr></thead>
+          <tbody id="versionsBody"></tbody>
+        </table>
+      </div>
+      <div class="grid">
+        <h2>原始 Policy JSON</h2>
+        <textarea id="policyJson" spellcheck="false"></textarea>
+        <div class="toolbar">
+          <button class="primary" id="saveJsonBtn">儲存 JSON</button>
+          <span class="muted">進階使用：可直接微調 message、priority、support_url。</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      apps: [],
+      stats: null,
+      policy: null,
+      selectedAppId: "",
+      selectedBuild: null,
+      selectedRuleId: "",
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(text) {
+      $("status").textContent = text;
+    }
+
+    function endpoint() {
+      return $("endpoint").value.replace(/\/+$/, "");
+    }
+
+    function token() {
+      return $("token").value.trim();
+    }
+
+    function days() {
+      return $("days").value || "30";
+    }
+
+    function selectedAppId() {
+      return $("appSelect").value || state.selectedAppId;
+    }
+
+    async function api(path, options = {}) {
+      if (!token()) throw new Error("請先輸入 Admin Token");
+      const res = await fetch(endpoint() + path, {
+        ...options,
+        headers: {
+          "authorization": "Bearer " + token(),
+          "content-type": "application/json; charset=utf-8",
+          ...(options.headers || {}),
+        },
+      });
+      const text = await res.text();
+      let body = {};
+      try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(body)}`);
+      return body;
+    }
+
+    async function loadApps() {
+      localStorage.setItem("appGuardEndpoint", $("endpoint").value);
+      localStorage.setItem("appGuardToken", token());
+      setStatus("載入 App 清單...");
+      const data = await api(`/admin/apps?days=${encodeURIComponent(days())}`);
+      state.apps = data.apps || [];
+      renderApps();
+      if (state.apps.length && !selectedAppId()) {
+        $("appSelect").value = state.apps[0].app_id;
+      }
+      if (selectedAppId()) await loadApp(selectedAppId());
+      setStatus(`已載入 ${state.apps.length} 個 App`);
+    }
+
+    async function loadApp(appId) {
+      if (!appId) throw new Error("請先選取 App ID");
+      state.selectedAppId = appId;
+      $("appSelect").value = appId;
+      setStatus(`查詢 ${appId}...`);
+      const [stats, rules] = await Promise.all([
+        api(`/admin/stats?app_id=${encodeURIComponent(appId)}&days=${encodeURIComponent(days())}`),
+        api(`/admin/rules?app_id=${encodeURIComponent(appId)}`),
+      ]);
+      state.stats = stats;
+      state.policy = rules.policy || defaultPolicy();
+      state.selectedBuild = null;
+      state.selectedRuleId = "";
+      $("selectedRuleMessage").value = "";
+      renderStats();
+      renderRules();
+      setStatus(`查詢完成：${appId}`);
+    }
+
+    function renderApps() {
+      $("appSelect").innerHTML = "";
+      $("appsBody").innerHTML = "";
+      for (const app of state.apps) {
+        const option = document.createElement("option");
+        option.value = app.app_id;
+        option.textContent = app.app_id;
+        $("appSelect").appendChild(option);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${escapeHtml(app.app_id)}</td><td>${app.checks || 0}</td><td>${app.installs || 0}</td>`;
+        tr.onclick = () => loadApp(app.app_id).catch(showError);
+        $("appsBody").appendChild(tr);
+      }
+    }
+
+    function renderStats() {
+      $("buildsBody").innerHTML = "";
+      $("versionsBody").innerHTML = "";
+      for (const row of state.stats?.builds || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${escapeHtml(row.version || "")}</td><td>${escapeHtml(row.build_id || "")}</td><td>${escapeHtml(row.batch_id || "")}</td><td>${row.checks || 0}</td><td>${row.installs || 0}</td>`;
+        tr.onclick = () => {
+          state.selectedBuild = row;
+          document.querySelectorAll("#buildsBody tr").forEach((r) => r.classList.remove("selected"));
+          tr.classList.add("selected");
+        };
+        $("buildsBody").appendChild(tr);
+      }
+      for (const row of state.stats?.versions || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${escapeHtml(row.version || "")}</td><td>${row.checks || 0}</td><td>${row.installs || 0}</td>`;
+        $("versionsBody").appendChild(tr);
+      }
+    }
+
+    function renderRules() {
+      $("rulesBody").innerHTML = "";
+      for (const rule of state.policy?.rules || []) {
+        const action = rule.action || {};
+        const status = action.status || "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(rule.id || "")}</td>
+          <td><span class="pill ${rule.enabled === false ? "" : status}">${rule.enabled === false ? "停用" : "啟用"}</span></td>
+          <td>${escapeHtml(JSON.stringify(rule.match || {}))}</td>
+          <td>${escapeHtml(status)}</td>
+          <td>${escapeHtml(action.message || "")}</td>
+        `;
+        tr.onclick = () => {
+          state.selectedRuleId = rule.id;
+          $("selectedRuleMessage").value = rule.action?.message || "";
+          document.querySelectorAll("#rulesBody tr").forEach((r) => r.classList.remove("selected"));
+          tr.classList.add("selected");
+        };
+        $("rulesBody").appendChild(tr);
+      }
+      $("policyJson").value = JSON.stringify(state.policy || defaultPolicy(), null, 2);
+    }
+
+    async function savePolicy() {
+      const appId = selectedAppId();
+      if (!appId) throw new Error("請先選取 App ID");
+      await api("/admin/rules", {
+        method: "POST",
+        body: JSON.stringify({ app_id: appId, policy: state.policy }),
+      });
+      await loadApp(appId);
+    }
+
+    function ensurePolicy() {
+      if (!state.policy) state.policy = defaultPolicy();
+      if (!Array.isArray(state.policy.rules)) state.policy.rules = [];
+    }
+
+    async function addDisableRule(key, value) {
+      if (!value) throw new Error(`沒有可封鎖的 ${key}`);
+      if (!confirm(`確定封鎖 ${key} = ${value}？`)) return;
+      ensurePolicy();
+      const id = `disable-${key}-${safeId(value)}`;
+      const existing = state.policy.rules.find((r) => r.id === id);
+      if (existing) {
+        existing.enabled = true;
+      } else {
+        state.policy.rules.push({
+          id,
+          enabled: true,
+          priority: 100,
+          match: { [key]: value },
+          action: {
+            status: "disabled",
+            disable: true,
+            message_level: "error",
+            message: "這個版本已被停用，請向提供者索取新版。",
+            next_check_after_seconds: 3600,
+            support_url: "",
+          },
+        });
+      }
+      await savePolicy();
+    }
+
+    async function addWarnOldVersion() {
+      const value = $("minVersion").value.trim();
+      if (!value) throw new Error("請輸入最低版本");
+      ensurePolicy();
+      const id = `warn-version-lt-${safeId(value)}`;
+      upsertRule(id, {
+        id,
+        enabled: true,
+        priority: 50,
+        match: { version_lt: value },
+        action: {
+          status: "warn",
+          message_level: "warning",
+          message: `目前版本較舊，建議更新到 ${value} 或更新版本。`,
+          min_version: value,
+          next_check_after_seconds: 86400,
+          support_url: "",
+        },
+      });
+      await savePolicy();
+    }
+
+    async function addDisableOldVersion() {
+      const value = $("minVersion").value.trim();
+      if (!value) throw new Error("請輸入最低版本");
+      if (!confirm(`確定停用所有低於 ${value} 的版本？`)) return;
+      ensurePolicy();
+      const id = `disable-version-lt-${safeId(value)}`;
+      upsertRule(id, {
+        id,
+        enabled: true,
+        priority: 95,
+        match: { version_lt: value },
+        action: {
+          status: "disabled",
+          disable: true,
+          message_level: "error",
+          message: `目前版本已停用，請更新到 ${value} 或更新版本。`,
+          min_version: value,
+          next_check_after_seconds: 3600,
+          support_url: "",
+        },
+      });
+      await savePolicy();
+    }
+
+    async function addDisableVersion() {
+      const value = $("disabledVersion").value.trim();
+      if (!value) throw new Error("請輸入要停用的版本號");
+      ensurePolicy();
+      const id = `disable-version-${safeId(value)}`;
+      upsertRule(id, {
+        id,
+        enabled: true,
+        priority: 90,
+        match: { version: value },
+        action: {
+          status: "disabled",
+          disable: true,
+          message_level: "error",
+          message: `版本 ${value} 已被停用，請向提供者索取新版。`,
+          next_check_after_seconds: 3600,
+          support_url: "",
+        },
+      });
+      await savePolicy();
+    }
+
+    function upsertRule(id, nextRule) {
+      const index = state.policy.rules.findIndex((r) => r.id === id);
+      if (index >= 0) state.policy.rules[index] = nextRule;
+      else state.policy.rules.push(nextRule);
+    }
+
+    async function setSelectedRuleEnabled(enabled) {
+      const rule = selectedRule();
+      rule.enabled = enabled;
+      await savePolicy();
+    }
+
+    async function deleteSelectedRule() {
+      const rule = selectedRule();
+      if (!confirm(`確定刪除規則 ${rule.id}？`)) return;
+      state.policy.rules = state.policy.rules.filter((r) => r.id !== rule.id);
+      state.selectedRuleId = "";
+      $("selectedRuleMessage").value = "";
+      await savePolicy();
+    }
+
+    async function saveSelectedRuleMessage() {
+      const rule = selectedRule();
+      if (!rule.action) rule.action = {};
+      rule.action.message = $("selectedRuleMessage").value;
+      await savePolicy();
+    }
+
+    function selectedRule() {
+      if (!state.selectedRuleId) throw new Error("請先選取一筆規則");
+      const rule = state.policy?.rules?.find((r) => r.id === state.selectedRuleId);
+      if (!rule) throw new Error("找不到選取的規則");
+      return rule;
+    }
+
+    function defaultPolicy() {
+      return {
+        schema_version: 1,
+        default: {
+          status: "allow",
+          message: "",
+          message_level: "info",
+          next_check_after_seconds: 86400,
+          support_url: "",
+        },
+        telemetry: { enabled: true, sample_rate: 1 },
+        rules: [],
+      };
+    }
+
+    function safeId(value) {
+      return String(value).replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || String(Date.now());
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      }[ch]));
+    }
+
+    function showError(error) {
+      console.error(error);
+      alert(error.message || String(error));
+      setStatus("操作失敗");
+    }
+
+    $("loadAppsBtn").onclick = () => loadApps().catch(showError);
+    $("loadAppBtn").onclick = () => loadApp(selectedAppId()).catch(showError);
+    $("appSelect").onchange = () => loadApp(selectedAppId()).catch(showError);
+    $("blockBuildBtn").onclick = () => addDisableRule("build_id", state.selectedBuild?.build_id || "").catch(showError);
+    $("blockBatchBtn").onclick = () => addDisableRule("batch_id", state.selectedBuild?.batch_id || "").catch(showError);
+    $("warnOldVersionBtn").onclick = () => addWarnOldVersion().catch(showError);
+    $("disableOldVersionBtn").onclick = () => addDisableOldVersion().catch(showError);
+    $("disableVersionBtn").onclick = () => addDisableVersion().catch(showError);
+    $("enableRuleBtn").onclick = () => setSelectedRuleEnabled(true).catch(showError);
+    $("disableRuleBtn").onclick = () => setSelectedRuleEnabled(false).catch(showError);
+    $("deleteRuleBtn").onclick = () => deleteSelectedRule().catch(showError);
+    $("saveRuleMessageBtn").onclick = () => saveSelectedRuleMessage().catch(showError);
+    $("saveJsonBtn").onclick = async () => {
+      try {
+        state.policy = JSON.parse($("policyJson").value);
+        await savePolicy();
+      } catch (error) {
+        showError(error);
+      }
+    };
+
+    $("endpoint").value = localStorage.getItem("appGuardEndpoint") || $("endpoint").value;
+    $("token").value = localStorage.getItem("appGuardToken") || "";
+  </script>
+</body>
+</html>

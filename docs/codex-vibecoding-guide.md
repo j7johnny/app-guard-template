@@ -10,6 +10,7 @@
 - 將 app_guard.py 複製到專案中，或使用既有的本機 SDK。
 - 新增 build_info.py 常數：APP_ID, VERSION, BUILD_ID, BATCH_ID, CHANNEL, ENDPOINT。
 - 在入口點最前面呼叫 startup_check，位置要早於耗時工作或主要功能啟動。
+- startup_check 預設每次啟動都會呼叫遠端 /check；不要自行加入 allow/warn 快取來跳過檢查。
 - 如果 result.disabled 為 true，顯示 result.message，然後以 exit code 1 結束。
 - 如果 result.warning 為 true，顯示 result.message，然後繼續執行。
 - 不得蒐集硬體 ID、使用者名稱、email、檔案路徑、剪貼簿、瀏覽器資料、命令列參數內容或完整 user agent。
