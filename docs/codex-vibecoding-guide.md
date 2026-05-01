@@ -1,5 +1,9 @@
 # Codex / VibeCoding 套用指南
 
+完整規格請優先閱讀：
+
+- `docs/ai-agent-integration.md`
+
 把 App Guard 套到任一 Python 專案時，可以直接把下面這段交給 Codex 或其他 VibeCoding 工具：
 
 ```text

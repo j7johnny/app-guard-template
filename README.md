@@ -18,6 +18,11 @@
 - `admin_web/`：HTML 管理台，可查詢 App、版本、build/batch，並維護規則。
 - `docs/`：中文操作文件與 VibeCoding 套用指南。
 
+AI coding agent 請優先閱讀：
+
+- `docs/ai-agent-integration.md`
+- `docs/codex-vibecoding-guide.md`
+
 ## SDK 預設行為
 
 - 每次程式啟動都呼叫一次遠端 `/check`。

@@ -2,6 +2,10 @@
 
 `app_guard.py` 是單檔 Python SDK，可直接放進 Python 腳本或 Python 打包成的 EXE 工具中。
 
+若是由 Codex、Claude Code 或其他 AI coding agent 整合，請先閱讀：
+
+- `../docs/ai-agent-integration.md`
+
 ## 最小整合方式
 
 把 `app_guard.py` 與產生好的 `build_info.py` 放進你的專案，然後在程式入口點最前面加入：
@@ -22,6 +26,8 @@ exit_if_disabled(result)
 ```
 
 如果遠端政策回傳 `disabled`，`exit_if_disabled(result)` 會停止程式。若只回傳 `warn`，SDK 會顯示提示後繼續執行。
+
+SDK 預設每次啟動都會呼叫遠端 `/check`。`allow` / `warn` 不會被快取成跳過下次檢查；只有 `disabled` 會在短期網路失敗時用快取維持封鎖。
 
 ## 隱私邊界
 
